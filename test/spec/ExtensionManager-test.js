@@ -33,12 +33,13 @@ define(function (require, exports, module) {
     
     require("thirdparty/jquery.mockjax.js");
     
-    var ExtensionManagerModel = require("extensibility/ExtensionManagerModel").ExtensionManagerModel,
-        ExtensionManagerView  = require("extensibility/ExtensionManagerView").ExtensionManagerView,
-        SpecRunnerUtils       = require("spec/SpecRunnerUtils"),
-        CollectionUtils       = require("utils/CollectionUtils"),
-        NativeApp             = require("utils/NativeApp"),
-        mockRegistryText      = require("text!spec/ExtensionManager-test-files/mockRegistry.json"),
+    var ExtensionManagerModel  = require("extensibility/ExtensionManagerModel").ExtensionManagerModel,
+        ExtensionManagerView   = require("extensibility/ExtensionManagerView").ExtensionManagerView,
+        InstallExtensionDialog = require("extensibility/InstallExtensionDialog"),
+        SpecRunnerUtils        = require("spec/SpecRunnerUtils"),
+        CollectionUtils        = require("utils/CollectionUtils"),
+        NativeApp              = require("utils/NativeApp"),
+        mockRegistryText       = require("text!spec/ExtensionManager-test-files/mockRegistry.json"),
         mockRegistry;
     
     describe("ExtensionManager", function () {
@@ -254,6 +255,46 @@ define(function (require, exports, module) {
                 });
             });
             
+            it("should show an install button for each item", function () {
+                setupRealModel();
+                runs(function () {
+                    CollectionUtils.forEach(mockRegistry, function (item) {
+                        var $button = $("button.install[data-extension-id=" + item.metadata.name + "]", view.$el);
+                        expect($button.length).toBe(1);
+                    });
+                });
+            });
+
+            it("should bring up the install dialog and install an item when install button is clicked", function () {
+                runs(function () {
+                    mockRegistry = {
+                        "basic-valid-extension": {
+                            "metadata": {
+                                "name": "basic-valid-extension",
+                                "title": "Basic Valid Extension",
+                                "version": "1.0.0"
+                            },
+                            "owner": "github:njx",
+                            "versions": [
+                                {
+                                    "version": "1.0.0",
+                                    "published": "2013-04-10T18:28:20.530Z"
+                                }
+                            ]
+                        }
+                    };
+                    spyOn(InstallExtensionDialog, "showDialog");
+                    setupRealModel();
+                });
+                runs(function () {
+                    var $button = $("button.install[data-extension-id=basic-valid-extension]", view.$el);
+                    expect($button.length).toBe(1);
+                    $button.click();
+                    expect(InstallExtensionDialog.showDialog)
+                        .toHaveBeenCalledWith("https://s3.amazonaws.com/repository.brackets.io/basic-valid-extension/basic-valid-extension-1.0.0.zip");
+                });
+            });
+                        
             it("should show the spinner before the registry appears successfully and hide it after", function () {
                 setupMockModel();
                 expect($(".spinner", view.$el).length).toBe(1);

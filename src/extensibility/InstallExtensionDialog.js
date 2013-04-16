@@ -269,10 +269,12 @@ define(function (require, exports, module) {
 
     /**
      * Initialize and show the dialog.
+     * @param {string=} urlToInstall If specified, immediately starts installing the given file as if the user had
+     *     specified it.
      * @return {$.Promise} A promise object that will be resolved when the selected extension
      *     has finished installing, or rejected if the dialog is cancelled.
      */
-    InstallExtensionDialog.prototype.show = function () {
+    InstallExtensionDialog.prototype.show = function (urlToInstall) {
         if (this._state !== STATE_CLOSED) {
             // Somehow the dialog got invoked twice. Just ignore this.
             return this._dialogDeferred.promise();
@@ -301,6 +303,12 @@ define(function (require, exports, module) {
         $(document.body).on("keyup.installDialog", this._handleKeyUp.bind(this));
         
         this._enterState(STATE_START);
+        if (urlToInstall) {
+            // Act as if the user had manually entered the URL.
+            this.$url.val(urlToInstall);
+            this._enterState(STATE_VALID_URL);
+            this._enterState(STATE_INSTALLING);
+        }
 
         this._dialogDeferred = new $.Deferred();
         return this._dialogDeferred.promise();
@@ -332,16 +340,21 @@ define(function (require, exports, module) {
     
     /**
      * @private
-     * Show a dialog that allows the user to enter the URL of an extension ZIP file to install.
+     * Show a dialog that allows the user to enter the URL of an extension ZIP file to install, or immediately
+     * starts installing the specified URL if one is provided.
+     * @param {string=} urlToInstall If specified, immediately starts installing the given file as if the user had
+     *     specified it.
      * @return {$.Promise} A promise object that will be resolved when the selected extension
      *     has finished installing, or rejected if the dialog is cancelled.
      */
-    function _showDialog(installer) {
+    function showDialog(urlToInstall) {
         var dlg = new InstallExtensionDialog(new InstallerFacade());
-        return dlg.show();
+        return dlg.show(urlToInstall);
     }
     
-    CommandManager.register(Strings.CMD_INSTALL_EXTENSION, Commands.FILE_INSTALL_EXTENSION, _showDialog);
+    CommandManager.register(Strings.CMD_INSTALL_EXTENSION, Commands.FILE_INSTALL_EXTENSION, showDialog);
+    
+    exports.showDialog = showDialog;
 
     // Exposed for unit testing only
     exports._Dialog = InstallExtensionDialog;

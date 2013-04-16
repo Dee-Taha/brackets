@@ -1,8 +1,8 @@
 <table class="table">
     {{#registry}}
         <tr>
-            <td class="ext-name">
-                {{#metadata.title}}{{metadata.title}}{{/metadata.title}}{{^metadata.title}}{{metadata.name}}{{/metadata.title}}
+            <td>
+                <span class="ext-name">{{#metadata.title}}{{metadata.title}}{{/metadata.title}}{{^metadata.title}}{{metadata.name}}{{/metadata.title}}</span>
                 <span class="muted ext-version">{{metadata.version}}</span><br/>
                 <span class="muted ext-author">
                     by 
@@ -28,6 +28,9 @@
                     {{/metadata.keywords}}
                     </span>
                 {{/metadata.keywords.length}}
+            </td>
+            <td>
+                <button class="btn install" data-extension-id="{{metadata.name}}">Install</button>
             </td>
         </tr>
     {{/registry}}

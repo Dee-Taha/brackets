@@ -28,10 +28,11 @@
 define(function (require, exports, module) {
     "use strict";
     
-    var Strings          = require("strings"),
-        NativeApp        = require("utils/NativeApp"),
-        registry_utils   = require("extensibility/registry_utils"),
-        registryTemplate = require("text!htmlContent/extension-manager-view.html");
+    var Strings                = require("strings"),
+        NativeApp              = require("utils/NativeApp"),
+        InstallExtensionDialog = require("extensibility/InstallExtensionDialog"),
+        registry_utils         = require("extensibility/registry_utils"),
+        registryTemplate       = require("text!htmlContent/extension-manager-view.html");
     
     /**
      * @constructor
@@ -44,12 +45,17 @@ define(function (require, exports, module) {
         this._template = Mustache.compile(registryTemplate);
         this.$el = $("<div class='extension-list'/>");
         
-        // Intercept clicks on external links to open in the native browser.
-        $(this.$el).on("click", "a", function (e) {
-            e.stopImmediatePropagation();
-            e.preventDefault();
-            NativeApp.openURLInDefaultBrowser($(e.target).attr("href"));
-        });
+        $(this.$el)
+            // Intercept clicks on external links to open in the native browser.
+            .on("click", "a", function (e) {
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                NativeApp.openURLInDefaultBrowser($(e.target).attr("href"));
+            })
+            // Handle install button clicks
+            .on("click", "button.install", function (e) {
+                self._installUsingDialog($(this).attr("data-extension-id"));
+            });
         
         var $spinner = $("<div class='spinner large spin'/>")
             .appendTo(this.$el);
@@ -97,6 +103,21 @@ define(function (require, exports, module) {
         
         // TODO: localize strings in template
         this.$el.html(this._template(context));
+    };
+    
+    /**
+     * @private
+     * Install the extension with the given ID using the install dialog.
+     * @param {string} id ID of the extension to install.
+     */
+    ExtensionManagerView.prototype._installUsingDialog = function (id) {
+        this._model.getRegistry().done(function (registry) {
+            var entry = registry[id];
+            if (entry) {
+                var url = "https://s3.amazonaws.com/repository.brackets.io/" + id + "/" + id + "-" + entry.metadata.version + ".zip";
+                InstallExtensionDialog.showDialog(url);
+            }
+        });
     };
     
     exports.ExtensionManagerView = ExtensionManagerView;
