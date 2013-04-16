@@ -31,6 +31,7 @@ define(function (require, exports, module) {
     var Strings                = require("strings"),
         NativeApp              = require("utils/NativeApp"),
         InstallExtensionDialog = require("extensibility/InstallExtensionDialog"),
+        ExtensionLoader        = require("utils/ExtensionLoader"),
         registry_utils         = require("extensibility/registry_utils"),
         registryTemplate       = require("text!htmlContent/extension-manager-view.html");
     
@@ -96,12 +97,27 @@ define(function (require, exports, module) {
      */
     ExtensionManagerView.prototype._render = function (registry) {
         // Create a Mustache context object containing the registry and our helper functions.
-        var context = { registry: registry };
+        var context = { registry: registry },
+            loadedMetadata = ExtensionLoader.getLoadedExtensionMetadata();
         ["lastVersionDate", "ownerLink", "formatUserId"].forEach(function (helper) {
             context[helper] = registry_utils[helper];
         });
         
+        // TODO: should this be mediated through the model instead of going to the ExtensionLoader
+        // directly?
+        context.isInstalled = function () {
+            return function (text, render) {
+                if (loadedMetadata[this.metadata.name]) {
+                    return render(text);
+                } else {
+                    return "";
+                }
+            };
+        };
+        
         // TODO: localize strings in template
+        // TODO: template should show "Installed" for already-installed items, but
+        // Mustache doesn't let you negate a section helper.
         this.$el.html(this._template(context));
     };
     
@@ -111,11 +127,22 @@ define(function (require, exports, module) {
      * @param {string} id ID of the extension to install.
      */
     ExtensionManagerView.prototype._installUsingDialog = function (id) {
+        var self = this;
         this._model.getRegistry().done(function (registry) {
             var entry = registry[id];
             if (entry) {
                 var url = "https://s3.amazonaws.com/repository.brackets.io/" + id + "/" + id + "-" + entry.metadata.version + ".zip";
-                InstallExtensionDialog.showDialog(url);
+                InstallExtensionDialog.showDialog(url)
+                    .done(function () {
+                        // When the install is completed, disable the "Install" button.
+                        // TODO: This is sort of bogus. We shouldn't wait for the user to dismiss the dialog
+                        // before showing the extension as installed...we should probably have real events from
+                        // the extension loader or model.
+                        // TODO: Would be nice to be able to reuse the template to get the button re-rendered right,
+                        // but re-rendering the whole template is overkill. Backbone would have been handy here.
+                        $("button.install[data-extension-id=" + id + "]", self.$el)
+                            .attr("disabled", "disabled");
+                    });
             }
         });
     };

@@ -36,6 +36,7 @@ define(function (require, exports, module) {
     var ExtensionManagerModel  = require("extensibility/ExtensionManagerModel").ExtensionManagerModel,
         ExtensionManagerView   = require("extensibility/ExtensionManagerView").ExtensionManagerView,
         InstallExtensionDialog = require("extensibility/InstallExtensionDialog"),
+        ExtensionLoader        = require("utils/ExtensionLoader"),
         SpecRunnerUtils        = require("spec/SpecRunnerUtils"),
         CollectionUtils        = require("utils/CollectionUtils"),
         NativeApp              = require("utils/NativeApp"),
@@ -173,7 +174,7 @@ define(function (require, exports, module) {
         });
         
         describe("ExtensionManagerView", function () {
-            var testWindow, view, model, modelDeferred;
+            var testWindow, view, model, modelDeferred, mockLoadedExtensions, installerDeferred;
             
             // Sets up a real model (with mock data).
             function setupRealModel() {
@@ -208,6 +209,14 @@ define(function (require, exports, module) {
                         };
                         return SpecRunnerUtils.findDOMText(this.actual.$el, expected);
                     }
+                });
+                mockLoadedExtensions = {};
+                installerDeferred = new $.Deferred();
+                spyOn(ExtensionLoader, "getLoadedExtensionMetadata").andCallFake(function () {
+                    return mockLoadedExtensions;
+                });
+                spyOn(InstallExtensionDialog, "showDialog").andCallFake(function () {
+                    return installerDeferred.promise();
                 });
             });
                 
@@ -264,6 +273,26 @@ define(function (require, exports, module) {
                     });
                 });
             });
+            
+            it("should show disabled install buttons for items that are already installed", function () {
+                runs(function () {
+                    mockLoadedExtensions = {
+                        "test-quickly": mockRegistry["test-quickly"].metadata,
+                        "long-desc-extension": mockRegistry["long-desc-extension"].metadata
+                    };
+                    setupRealModel();
+                });
+                runs(function () {
+                    CollectionUtils.forEach(mockRegistry, function (item) {
+                        var $button = $("button.install[data-extension-id=" + item.metadata.name + "]", view.$el);
+                        if (mockLoadedExtensions[item.metadata.name]) {
+                            expect($button.attr("disabled")).toBeTruthy();
+                        } else {
+                            expect($button.attr("disabled")).toBeFalsy();
+                        }
+                    });
+                });
+            });
 
             it("should bring up the install dialog and install an item when install button is clicked", function () {
                 runs(function () {
@@ -283,7 +312,6 @@ define(function (require, exports, module) {
                             ]
                         }
                     };
-                    spyOn(InstallExtensionDialog, "showDialog");
                     setupRealModel();
                 });
                 runs(function () {
@@ -293,6 +321,35 @@ define(function (require, exports, module) {
                     expect(InstallExtensionDialog.showDialog)
                         .toHaveBeenCalledWith("https://s3.amazonaws.com/repository.brackets.io/basic-valid-extension/basic-valid-extension-1.0.0.zip");
                 });
+            });
+            
+            it("should disable the install button for an item immediately after installing it", function () {
+                runs(function () {
+                    mockRegistry = {
+                        "basic-valid-extension": {
+                            "metadata": {
+                                "name": "basic-valid-extension",
+                                "title": "Basic Valid Extension",
+                                "version": "1.0.0"
+                            },
+                            "owner": "github:njx",
+                            "versions": [
+                                {
+                                    "version": "1.0.0",
+                                    "published": "2013-04-10T18:28:20.530Z"
+                                }
+                            ]
+                        }
+                    };
+                    setupRealModel();
+                });
+                runs(function () {
+                    var $button = $("button.install[data-extension-id=basic-valid-extension]", view.$el);
+                    $button.click();
+                    installerDeferred.resolve();
+                    expect($button.attr("disabled")).toBeTruthy();
+                });
+               
             });
                         
             it("should show the spinner before the registry appears successfully and hide it after", function () {

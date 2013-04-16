@@ -39,6 +39,7 @@ define(function (require, exports, module) {
         Async               = require("utils/Async");
     
     var _init       = false,
+        _metadata   = {},
         /** @type {Object<string, Object>}  Stores require.js contexts of extensions */
         contexts    = {},
         srcPath     = FileUtils.getNativeBracketsDirectoryPath();
@@ -67,13 +68,34 @@ define(function (require, exports, module) {
      *
      * @param {!string} name, used to identify the extension
      * @return {!Object} A require.js require object used to load the extension, or undefined if 
-     * there is no require object ith that name
+     * there is no require object with that name
      */
     function getRequireContextForExtension(name) {
         return contexts[name];
     }
-
     
+    /**
+     * Loads the package.json file in the given baseUrl folder.
+     * @return {$.Promise} A promise object that is resolved with the parsed contents of the package.json file,
+     *     or rejected if there is no package.json or the contents are not valid JSON.
+     */
+    function _loadPackageJson(baseUrl) {
+        var result = new $.Deferred();
+        FileUtils.readAsText(new NativeFileSystem.FileEntry(baseUrl + "/package.json"))
+            .done(function (text) {
+                try {
+                    var json = JSON.parse(text);
+                    result.resolve(json);
+                } catch (e) {
+                    result.reject();
+                }
+            })
+            .fail(function () {
+                result.reject();
+            });
+        return result.promise();
+    }
+
     /**
      * Loads the extension that lives at baseUrl into its own Require.js context
      *
@@ -100,7 +122,14 @@ define(function (require, exports, module) {
         extensionRequire([entryPoint],
             function () {
                 // console.log("[Extension] finished loading " + config.baseUrl);
-                result.resolve();
+                _loadPackageJson(config.baseUrl)
+                    .done(function (metadata) {
+                        console.log("[Extension] got metadata for " + metadata.name + ": " + JSON.stringify(metadata));
+                        _metadata[metadata.name] = metadata;
+                    })
+                    .always(function () {
+                        result.resolve();
+                    });
             },
             function errback(err) {
                 console.error("[Extension] failed to load " + config.baseUrl, err);
@@ -297,9 +326,19 @@ define(function (require, exports, module) {
         return promise;
     }
     
+    /**
+     * Returns an object containing metadata for every loaded extension that has a package.json file.
+     * @return {object} an object whose keys are the extension name (from the metadata) and whose values are
+     *     the contents of the package.json file as a parsed object.
+     */
+    function getLoadedExtensionMetadata() {
+        return _metadata;
+    }
+    
     exports.init = init;
     exports.getUserExtensionPath = getUserExtensionPath;
     exports.getRequireContextForExtension = getRequireContextForExtension;
+    exports.getLoadedExtensionMetadata = getLoadedExtensionMetadata;
     exports.loadExtension = loadExtension;
     exports.testExtension = testExtension;
     exports.loadAllExtensionsInNativeDirectory = loadAllExtensionsInNativeDirectory;

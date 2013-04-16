@@ -30,7 +30,8 @@
                 {{/metadata.keywords.length}}
             </td>
             <td>
-                <button class="btn install" data-extension-id="{{metadata.name}}">Install</button>
+                <!-- TODO: super bogus for now, just getting the feel of it -->
+                <button class="btn install" data-extension-id="{{metadata.name}}" {{#isInstalled}}disabled{{/isInstalled}}>Install{{#isInstalled}}ed{{/isInstalled}}</button>
             </td>
         </tr>
     {{/registry}}
